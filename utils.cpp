@@ -50,7 +50,7 @@ void logSumColumn(const std::vector<std::vector<long double>>&xs,
 
 
 
-void loadSeq(std::string filename, std::vector<std::vector<int>>&seqs){
+void loadSeq(const std::string&filename, std::vector<std::vector<int>>&seqs){
     std::fstream f;
     f.open(filename, std::ios::in);
     std::string line;
@@ -65,3 +65,51 @@ void loadSeq(std::string filename, std::vector<std::vector<int>>&seqs){
         tmp = f.get();
     }
 }
+
+
+void dumpSeq(const std::string&filename,
+             const std::vector<std::vector<int>>&seqs){
+    std::fstream f;
+    f.open(filename, std::ios::out);
+    for (auto seq = seqs.begin(); seq != seqs.end(); ++seq){
+        for (auto l = seq -> begin(); l != seq -> end(); ++l){
+            f << *l + 'A';
+        }
+        f << std::endl;
+    }
+    f.close();
+}
+
+
+
+long double compare(const std::vector<std::vector<int>>&a,
+                    const std::vector<std::vector<int>>&b){
+    long double same = 0;
+    long double all = 0;
+
+    if ( a.size() != b.size() ){
+        return -1;
+    }
+    
+    for (auto i = 0u; i < a.size(); ++i){
+        if (a[i].size() != b[i].size()){
+            return -1;
+        }
+        for (auto j = 0u; j < b.size(); ++j){                        
+            same += a[i][j] == b[i][j] ? 1 : 0;
+            all += 1;
+        }
+    }
+    return same / all;
+}
+
+
+void dumpAnswer(const std::string&filename, const std::vector<int>&answer){
+    std::fstream f;
+    f.open(filename, std::ios::out);
+    for (auto it = answer.begin(); it != answer.end(); ++it){
+        f << "model_0" << answer[*it] << std::endl;
+    }    
+}
+    
+void loadAnswer(const std::string&filename, std::vector<int>&answer);

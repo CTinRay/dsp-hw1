@@ -3,11 +3,11 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
-
+#include <algorithm>
 
 void print2D(const std::vector<std::vector<long double>>&x){
-    for (int i = 0; i < x.size(); ++i){
-        for (int j = 0; j < x[i].size(); ++j ){
+    for (auto i = 0u; i < x.size(); ++i){
+        for (auto j = 0u; j < x[i].size(); ++j ){
             std::cout << x[i][j] << " ";
         }
         std::cout << std::endl;
@@ -15,7 +15,7 @@ void print2D(const std::vector<std::vector<long double>>&x){
 }
 
 void print2D(const std::vector<long double>&x){
-    for (int i = 0; i < x.size(); ++i){
+    for (auto i = 0u; i < x.size(); ++i){
             std::cout << x[i] << " ";
     }
         std::cout << std::endl;
@@ -189,18 +189,13 @@ void HMM::Accumulator::accumulate(const std::vector<int>&observed,
                                   const std::vector<std::vector<long double>>&outputprob){
     std::vector<std::vector<long double>>gamma(observed.size(), std::vector<long double>(nStates, 0));
     computeGamma(alpha, beta, gamma);
-    // std::cout << "gamma" << std::endl;
-    // print2D(gamma);
     std::vector<long double>tmp(nStates, 0);
     logSumColumn(gamma, tmp);
 
     for (unsigned int i = 0; i < nStates; ++i){
         gammaSum[i] = logSum(gammaSum[i], tmp[i]);
     }
-    
-    std::cout << "gammaSum" << std::endl;
-    print2D(gammaSum);
-    
+        
     // Start Probability
     for (auto i = 0u; i < nStates; ++i){
         s[i] = logSum(s[i], gamma[0][i]);
@@ -214,10 +209,6 @@ void HMM::Accumulator::accumulate(const std::vector<int>&observed,
         }
         std::vector<std::vector<long double>>xit(nStates, std::vector<long double>(nStates));        
         computeXi(alpha[t], beta[t + 1], ot1prob, transprob, xit);
-
-        // std::cout << "xit:" << std::endl;
-        // print2D(xiSum);
-        // std::cout << std::endl;
         
         for (auto i = 0u; i < nStates; ++i ){
             for (auto j = 0u; j < nStates; ++j ){
@@ -225,17 +216,6 @@ void HMM::Accumulator::accumulate(const std::vector<int>&observed,
             }
         }
     }
-    std::cout << "xi:" << std::endl;
-    // print2D(xiSum);
-    for (int i = 0; i < nStates; ++i){
-        std::cout << logSum(xiSum[i]) << ' ';
-    }
-    std::cout << std::endl;
-
-    
-    // std::cout << "xiSum:" << std::endl;
-    // print2D(xiSum);
-    // std::cout << std::endl;
 
     // Output probability
     for (auto t = 0u; t < observed.size(); ++t){
@@ -255,9 +235,14 @@ void HMM::updateProb(const HMM::Accumulator&accumulator){
     }
     
     // Transition probability
+    std::vector<long double>sum(nStates);
     for (auto i = 0u; i < nStates; ++i){
         for (auto j = 0u; j < nStates; ++j){
             transprob[i][j] = accumulator.xiSum[i][j] - accumulator.gammaSum[i];
+        }
+        sum[i] = logSum(transprob[i]);
+        for (auto j = 0u; j < nStates; ++j){
+            transprob[i][j] -= sum[i];
         }
     }
 
@@ -293,3 +278,66 @@ void HMM::train(const unsigned int nIter,
     }
 }
 
+
+long double HMM::decode(const std::vector<int>&observed, std::vector<int>&hidden){
+    std::vector<long double>probs(nStates);
+    for (auto s = 0u; s < nStates; ++s ){
+         probs[s] = startprob[s] + outputprob[s][observed[0]];
+     }
+
+     std::vector<std::vector<unsigned int>>
+         from(observed.size(), std::vector<unsigned int>(nStates));
+     
+     for (auto i = 1u; i < observed.size(); ++i){
+         for (auto s2 = 0u; s2 < nStates; ++s2){
+             long double maxProb = -INFINITY;
+             for (auto s1 = 0u; s1 < nStates; ++s1){
+                 long double prob
+                     = probs[s1] + transprob[s1][s2] + outputprob[s2][observed[i]];
+                 if (prob > maxProb){
+                     maxProb = prob;
+                     from[i][s2] = s1;
+                 }
+             }
+             probs[s2] = maxProb;
+         }
+     }
+
+     long double maxProb = -INFINITY;
+     for (auto s = 0u; s < nStates; ++s){
+         if (probs[s] > maxProb){
+             maxProb = probs[s];
+             hidden.back() = s;
+         }         
+     }
+
+     for (int t = observed.size() - 2; t >= 0; --t){
+         hidden[t] = from[t + 1][hidden[t + 1]];
+     }
+     
+     return maxProb;
+}
+
+
+long double HMM::test(const std::vector<int>&observed) const {
+    std::vector<long double>probs(nStates);
+    for (auto s = 0u; s < nStates; ++s ){
+        probs[s] = startprob[s] + outputprob[s][observed[0]];
+    }
+     
+    for (auto i = 1u; i < observed.size(); ++i){
+        std::vector<long double>prevProbs = probs;
+        for (auto s2 = 0u; s2 < nStates; ++s2){
+            long double maxProb = -INFINITY;
+            for (auto s1 = 0u; s1 < nStates; ++s1){
+                long double prob
+                    = prevProbs[s1] + transprob[s1][s2] + outputprob[s2][observed[i]];
+                maxProb = prob > maxProb ? prob : maxProb;
+            }
+            probs[s2] = maxProb;
+        }
+    }
+
+    return *std::max_element(probs.begin(), probs.end());
+}
+    
